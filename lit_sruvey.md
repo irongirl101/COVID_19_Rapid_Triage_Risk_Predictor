@@ -44,4 +44,4 @@ cohort 1, n = 55; cohort 2, n = 39), and in-hospital death
 data into a training set and a test set with a ratio of 7:3.
 
 ## Results from Base Paper 
-[image](image.png)
+![image](image.png)
