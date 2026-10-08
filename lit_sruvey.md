@@ -42,3 +42,6 @@ cohort 1, n = 55; cohort 2, n = 39), and in-hospital death
 (within 28 days) (positive cases in cohort 1, n = 32; cohort
 2, n = 29). In cohort 1 (n=1662), we further splitted the
 data into a training set and a test set with a ratio of 7:3.
+
+## Results from Base Paper 
+[image](image.png)
