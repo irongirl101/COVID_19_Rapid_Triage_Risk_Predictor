@@ -45,3 +45,10 @@ data into a training set and a test set with a ratio of 7:3.
 
 ## Results from Base Paper 
 ![image](image.png)
+
+## Gaps 
+- Dataset is extremely small 
+- AUROC is not enough for a triage system 
+- No proper calibiration analysis 
+- Missing data is not addresses as a central problem 
+- No SHAP (we will be working on this)
