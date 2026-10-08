@@ -6,7 +6,9 @@ high-risk inpatients at the time of admissions.
 ## Paper Study 
 In our study, 3522 NCP inpatients from 39 designated hospitals in China between December 27, 2019, and March 31, 2020 were preliminarily included according to the criteria as follows: 
 (a) confirmed positive SARS-CoV-2 nucleic acid test; 
+
 (b) thin-section CT examinations ( > 2.5 mm) and laboratory tests on the dateof admission; 
+
 (c) clear prognosis information was available (discharge, or adverse outcomes including in-hospital death, the admission to intensive care unit [ICU] and requiring mechanical ventilation support [MV]). 
 
 Further, patients were filtered. Exclusion criteria included 
