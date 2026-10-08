@@ -5,22 +5,30 @@ high-risk inpatients at the time of admissions.
 
 ## Paper Study 
 In our study, 3522 NCP inpatients from 39 designated hospitals in China between December 27, 2019, and March 31, 2020 were preliminarily included according to the criteria as follows: 
+
 (a) confirmed positive SARS-CoV-2 nucleic acid test; 
 (b) thin-section CT examinations ( > 2.5 mm) and laboratory tests on the dateof admission; 
 (c) clear prognosis information was available (discharge, or adverse outcomes including in-hospital death, the admission to intensive care unit [ICU] and requiring mechanical ventilation support [MV]). 
 
 Further, patients were filtered. Exclusion criteria included 
+
 (a) Patients age < 18; 
+
 (b)Patients transferred to other hospitals or remaining hospitalized without any adverse outcomes; 
+
 (c) CT scans without a lung-related convolutional kernel; 
+
 (d) CT scans lack serial information or with motion artifacts or significant resolution reductions. Figure 1 shows the procedure to enroll patients.
 
+
 The following data were collected and analyzed: 
-*(i) Radiomics
-features (Radiom) 
+**(i) Radiomics features (Radiom) 
+
 (ii) Laboratory results (Lab) 
+
 (iii)Clinical features (Clin) 
-(iv) Radiologist findings.*
+
+(iv) Radiologist findings.**
 
 Data Split: 
 We split the cohort into two subsets based on the date of admission: cohort 1 (n = 1662) for model development and cohort 2 (n = 700) for the validation and comparison
