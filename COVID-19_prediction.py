@@ -59,6 +59,14 @@ def load_legacy_selector(path, *, raise_on_error=True):
     # Compatibility with older scikit-learn SelectFromModel objects
     if not hasattr(model, "importance_getter"):
         model.importance_getter = "auto"
+    estimator = getattr(model, "estimator", None)
+    if (
+        model.threshold is None
+        and getattr(estimator, "penalty", None) == "l1"
+        and getattr(estimator, "l1_ratio", "legacy") is None
+    ):
+        # Older sklearn pickles relied on the default 1e-5 threshold.
+        model.threshold = 1e-5
 
     return model
 
@@ -260,7 +268,113 @@ def _predict_or_default(model, X):
     return model.predict(X)
 
 
-def radiomicsModel(radiomics_path):
+def _selected_feature_names(selector, feature_names):
+    if selector is None:
+        return list(feature_names)
+
+    support = selector.get_support()
+    if len(support) != len(feature_names):
+        raise ValueError(
+            "Feature selector output does not match the input feature names."
+        )
+
+    return [
+        name for name, selected in zip(feature_names, support) if selected
+    ]
+
+
+def _print_shap_explanation(model, X, feature_names, outcome):
+    """Print per-patient SHAP contributions to the model's class-1 probability."""
+    if model is None:
+        print(f"SHAP explanation unavailable for {outcome}: model is unavailable.")
+        return
+
+    if not hasattr(model, "predict_proba"):
+        raise RuntimeError(
+            f"Cannot explain {outcome}: its model does not provide predict_proba."
+        )
+
+    import shap
+
+    classes = list(model.classes_)
+    if 1 not in classes:
+        raise RuntimeError(
+            f"Cannot explain {outcome}: the model has no positive class labeled 1."
+        )
+    positive_class_index = classes.index(1)
+
+    X_values = np.asarray(X, dtype=float)
+    if X_values.ndim == 1:
+        X_values = X_values.reshape(1, -1)
+    if X_values.shape[1] != len(feature_names):
+        raise ValueError(
+            f"Cannot explain {outcome}: {X_values.shape[1]} model features "
+            f"but {len(feature_names)} feature names were provided."
+        )
+
+    # Inputs are standardized, so zero represents the training-feature mean.
+    background = np.zeros((1, X_values.shape[1]))
+    model_type = type(model).__name__
+    is_tree_model = (
+        hasattr(model, "tree_")
+        or hasattr(model, "booster_")
+        or hasattr(model, "_Booster")
+        or model_type.startswith("LGBM")
+    )
+
+    if is_tree_model:
+        explainer = shap.TreeExplainer(
+            model,
+            data=background,
+            model_output="probability",
+        )
+        shap_values = explainer.shap_values(X_values)
+    else:
+        def positive_class_probability(rows):
+            probabilities = np.asarray(model.predict_proba(rows))
+            return probabilities[:, positive_class_index]
+
+        explainer = shap.KernelExplainer(
+            positive_class_probability,
+            background,
+        )
+        shap_values = explainer.shap_values(X_values)
+
+    expected_value = np.asarray(explainer.expected_value)
+    if expected_value.ndim > 0 and expected_value.size > 1:
+        base_value = float(expected_value.reshape(-1)[positive_class_index])
+    else:
+        base_value = float(expected_value.reshape(-1)[0])
+
+    if isinstance(shap_values, list):
+        shap_values = shap_values[positive_class_index]
+    shap_values = np.asarray(shap_values)
+    if shap_values.ndim == 3:
+        shap_values = shap_values[:, :, positive_class_index]
+    if shap_values.ndim == 1:
+        shap_values = shap_values.reshape(1, -1)
+
+    probabilities = np.asarray(model.predict_proba(X_values))[
+        :, positive_class_index
+    ]
+    print(
+        f"\nSHAP for {outcome} (class-1 probability; "
+        "reference is zero-valued standardized features):"
+    )
+    for row_index, row_values in enumerate(shap_values):
+        print(
+            f"Patient {row_index + 1}: model output={probabilities[row_index]:.4f}, "
+            f"baseline={base_value:.4f}"
+        )
+        top_indices = np.argsort(np.abs(row_values))[::-1][:10]
+        for feature_index in top_indices:
+            print(
+                f"  {feature_names[feature_index]}: "
+                f"{row_values[feature_index]:+.4f}"
+            )
+
+
+def radiomicsModel(radiomics_path, explain=False):
     """Run the radiomics-only prediction model."""
 
     print("Loading radiomics data:")
@@ -296,6 +410,13 @@ def radiomicsModel(radiomics_path):
 
     ICU_x = _transform_or_default(ICU_fsmodel, test_X_std)
     ICU = _predict_or_default(ICU_clfmodel, ICU_x)
+    if explain:
+        _print_shap_explanation(
+            ICU_clfmodel,
+            ICU_x,
+            _selected_feature_names(ICU_fsmodel, test_X_std.columns),
+            "ICU",
+        )
 
     # -----------------------------
     # Mechanical ventilation
@@ -304,6 +425,13 @@ def radiomicsModel(radiomics_path):
     MV_clf_path = resolve_model_path("radiomics_models_MV_clfmodel.joblib")
     MV_clfmodel = load_classifier(MV_clf_path, raise_on_error=False)
     MV = _predict_or_default(MV_clfmodel, test_X_std)
+    if explain:
+        _print_shap_explanation(
+            MV_clfmodel,
+            test_X_std,
+            list(test_X_std.columns),
+            "mechanical ventilation",
+        )
 
     # -----------------------------
     # Death
@@ -317,6 +445,13 @@ def radiomicsModel(radiomics_path):
 
     death_x = _transform_or_default(death_fsmodel, test_X_std)
     death = _predict_or_default(death_clfmodel, death_x)
+    if explain:
+        _print_shap_explanation(
+            death_clfmodel,
+            death_x,
+            _selected_feature_names(death_fsmodel, test_X_std.columns),
+            "death",
+        )
 
     if ICU is None:
         print("Warning: ICU model is unavailable in the current environment.")
@@ -333,7 +468,7 @@ def radiomicsModel(radiomics_path):
     )
 
 
-def radiomicsClinLab(radiomics_path, lab_path):
+def radiomicsClinLab(radiomics_path, lab_path, explain=False):
     """Run the radiomics + clinical + laboratory prediction model."""
 
     print("Loading radiomics data:")
@@ -400,6 +535,8 @@ def radiomicsClinLab(radiomics_path, lab_path):
         patient_input_radioclinlab
         - mean_std[0, :]
     ) / mean_std[1, :]
+    radioclinlab_feature_names = list(reordered.columns) + list(lab_data.columns)
+    test_X_std.columns = radioclinlab_feature_names
 
     # -----------------------------
     # ICU
@@ -413,6 +550,13 @@ def radiomicsClinLab(radiomics_path, lab_path):
 
     ICU_x = _transform_or_default(ICU_fsmodel, test_X_std)
     ICU = _predict_or_default(ICU_clfmodel, ICU_x)
+    if explain:
+        _print_shap_explanation(
+            ICU_clfmodel,
+            ICU_x,
+            _selected_feature_names(ICU_fsmodel, test_X_std.columns),
+            "ICU",
+        )
 
     # -----------------------------
     # Mechanical ventilation
@@ -426,6 +570,13 @@ def radiomicsClinLab(radiomics_path, lab_path):
 
     MV_x = _transform_or_default(MV_fsmodel, test_X_std)
     MV = _predict_or_default(MV_clfmodel, MV_x)
+    if explain:
+        _print_shap_explanation(
+            MV_clfmodel,
+            MV_x,
+            _selected_feature_names(MV_fsmodel, test_X_std.columns),
+            "mechanical ventilation",
+        )
 
     # -----------------------------
     # Death
@@ -439,6 +590,13 @@ def radiomicsClinLab(radiomics_path, lab_path):
 
     death_x = _transform_or_default(death_fsmodel, test_X_std)
     death = _predict_or_default(death_clfmodel, death_x)
+    if explain:
+        _print_shap_explanation(
+            death_clfmodel,
+            death_x,
+            _selected_feature_names(death_fsmodel, test_X_std.columns),
+            "death",
+        )
 
     if ICU is None:
         print("Warning: ICU model is unavailable in the current environment.")
@@ -474,6 +632,12 @@ def parse_opts():
         help="Path to laboratory CSV file",
     )
 
+    parser.add_argument(
+        "--explain",
+        action="store_true",
+        help="Show SHAP feature contributions for each available outcome model",
+    )
+
     return parser.parse_args()
 
 
@@ -485,7 +649,8 @@ if __name__ == "__main__":
 
         # Radiomics-only
         radiomicsModel(
-            opt.radiomics_data
+            opt.radiomics_data,
+            explain=opt.explain,
         )
 
     else:
@@ -494,5 +659,5 @@ if __name__ == "__main__":
         radiomicsClinLab(
             opt.radiomics_data,
             opt.lab_data,
+            explain=opt.explain,
         )
-

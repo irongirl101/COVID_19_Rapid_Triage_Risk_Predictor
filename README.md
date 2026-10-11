@@ -126,6 +126,13 @@ python proc_radiomic_feature.py --dicom_root <dcm> --lesion_mask_root <seg> --sa
 python COVID-19_prediction.py --radiomics_data <save_root\final_merge_feature.csv>
 ```
 
+Add `--explain` to print the ten strongest SHAP feature contributions for each
+available outcome model:
+
+```shell
+python COVID-19_prediction.py --radiomics_data <save_root\final_merge_feature.csv> --explain
+```
+
 1. For models that include clinical symptoms, demographics and lab test results     (`RadioClinLab`), you can prepare an additional CSV input, according to “`example_lab_input.csv`” (refer to the “`units.txt`” for units and meanings of the entries). This file should also be placed into the root directory of the prediction pipeline (`<project_root>\<lab_input.csv>`).
 2. To use the “`RadioClinLab`” model, use the command line code
 
@@ -133,3 +140,13 @@ python COVID-19_prediction.py --radiomics_data <save_root\final_merge_feature.cs
 python COVID-19_prediction --radiomics_data <save_root\final_merge_feature.csv> --lab_data <lab_input.csv>
 ```
 
+For SHAP explanations with the combined model, add `--explain`:
+
+```shell
+python COVID-19_prediction.py --radiomics_data <save_root\final_merge_feature.csv> --lab_data <lab_input.csv> --explain
+```
+
+SHAP values describe how features move the model's class-1 probability relative
+to zero-valued standardized features (the training-feature mean). They explain
+the model output; they do not establish that its predictions are clinically
+correct or validated.
