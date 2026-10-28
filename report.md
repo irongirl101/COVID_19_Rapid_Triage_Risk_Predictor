@@ -44,6 +44,21 @@ The prediction script loads saved classifiers from the `models/` directory and v
 
 The results are reported in CLI output, and `--explain` can provide SHAP-based feature-attribution summaries that show the strongest contributors for each prediction.
 
+### SHAP interpretation
+SHAP (SHapley Additive exPlanations) is a model-interpretability method used to explain how individual input features contribute to a prediction. In this project, SHAP is especially useful because the model may rely on many radiomics features that are not immediately intuitive to clinicians.
+
+The intuition behind SHAP is simple: the model starts with a baseline prediction (for example, the average predicted risk in the dataset), and each input feature pushes the prediction upward or downward. A positive SHAP value means that a feature increased the predicted risk for that patient, while a negative SHAP value means it decreased the predicted risk. Summing all feature contributions gives the final model output relative to that baseline.
+
+In practice, SHAP helps answer questions like:
+
+- Which features most strongly increased a patient’s predicted ICU risk?
+- Which radiomics or clinical variables are driving the model’s decision?
+- Are the most important features aligned with clinical expectations or do they reveal model-specific patterns?
+
+This is particularly valuable in a radiomics-based pipeline, where many features describe image texture, intensity, shape, or lesion heterogeneity. These features are often not directly readable by eye, so SHAP provides a way to translate abstract model behavior into interpretable contributions.
+
+It is important to note that SHAP explains model output, not causality. A feature with a large SHAP value is influential for the prediction, but it does not prove that the feature is the direct cause of the outcome. The explanations are intended to support interpretability and clinical review rather than replace domain expertise.
+
 ## Input formats
 ### Radiomics-only mode
 Command pattern:
